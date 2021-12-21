@@ -23,6 +23,8 @@ use snarkvm_utilities::{FromBytes, ToBytes, UniformRand};
 
 use rand::{CryptoRng, Rng};
 
+use std::time::Instant;
+
 /// A Proof of Succinct Work miner and verifier.
 #[derive(Clone)]
 pub struct PoSW<N: Network> {
@@ -79,6 +81,7 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
         let pk = self.proving_key.as_ref().expect("tried to mine without a PK set up");
 
         loop {
+            let prove_start = Instant::now();
             // Sample a random nonce.
             block_header.set_nonce(UniformRand::rand(rng));
 
@@ -89,6 +92,7 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             block_header.set_proof(
                 <<N as Network>::PoSWSNARK as SNARK>::prove_with_terminator(pk, &circuit, terminator, rng)?.into(),
             );
+            trace!("Prove time: {:?}", prove_start.elapsed());
 
             if self.verify(block_header) {
                 break;
