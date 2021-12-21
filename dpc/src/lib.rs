@@ -60,6 +60,9 @@ extern crate derivative;
 #[macro_use]
 extern crate thiserror;
 
+#[macro_use]
+extern crate tracing;
+
 pub mod account;
 pub use account::*;
 

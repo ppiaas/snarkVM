@@ -138,6 +138,9 @@ version = "1.0"
 [dependencies.thiserror]
 version = "1.0"
 
+[dependencies.tracing]
+version = "0.1"
+
 [dev-dependencies.bincode]
 version = "1.3"
 
