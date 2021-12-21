@@ -92,7 +92,7 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             block_header.set_proof(
                 <<N as Network>::PoSWSNARK as SNARK>::prove_with_terminator(pk, &circuit, terminator, rng)?.into(),
             );
-            trace!("Height: {}, Timestamp: {}, Difficulty: {}, Weight: {}, Prove time: {:?}", block_header.height(), block_header.timestamp(), block_header.difficulty_target(), block_header.cumulative_weight(), prove_start.elapsed());
+            trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}, ", prove_start.elapsed(), block_header.height(), block_header.timestamp(), block_header.difficulty_target(), block_header.cumulative_weight());
 
             if self.verify(block_header) {
                 break;
