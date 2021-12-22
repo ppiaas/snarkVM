@@ -31,6 +31,16 @@ mod cuda;
 #[cfg(all(feature = "cuda", target_arch = "x86_64"))]
 static HAS_CUDA_FAILED: AtomicBool = AtomicBool::new(false);
 
+#[cfg(all(feature = "cuda", target_arch = "x86_64"))]
+pub fn is_cuda_enabled() -> bool {
+    std::env::var("ALEO_CUDA_ENABLED")
+        .and_then(|v| match v.parse() {
+            Ok(val) => Ok(val),
+            Err(_) => Ok(true),
+        })
+        .unwrap_or(true)
+}
+
 pub struct VariableBaseMSM;
 
 impl VariableBaseMSM {
@@ -51,6 +61,9 @@ impl VariableBaseMSM {
         if TypeId::of::<G>() == TypeId::of::<G1Affine>() {
             #[cfg(all(feature = "cuda", target_arch = "x86_64"))]
             {
+                if !is_cuda_enabled() {
+                    return standard::msm_standard(bases, scalars);
+                }
                 if !HAS_CUDA_FAILED.load(Ordering::SeqCst) {
                     match cuda::msm_cuda(bases, scalars) {
                         Ok(x) => return x,
@@ -62,6 +75,13 @@ impl VariableBaseMSM {
                 }
             }
         }
+        standard::msm_standard(bases, scalars)
+    }
+
+    pub fn msm_standard<G: AffineCurve>(
+        bases: &[G],
+        scalars: &[<G::ScalarField as PrimeField>::BigInteger],
+    ) -> G::Projective {
         standard::msm_standard(bases, scalars)
     }
 }
@@ -94,6 +114,14 @@ mod tests {
         let (bases, scalars) = test_data(334563456, 100);
         let rust = standard::msm_standard(bases.as_slice(), scalars.as_slice());
         let naive = VariableBaseMSM::msm_naive(bases.as_slice(), scalars.as_slice());
+        assert_eq!(rust, naive);
+    }
+
+    #[test]
+    fn test_multi_scalar_mul() {
+        let (bases, scalars) = test_data(334563456, 100);
+        let rust = VariableBaseMSM::msm_naive(bases.as_slice(), scalars.as_slice());
+        let naive = VariableBaseMSM::multi_scalar_mul(bases.as_slice(), scalars.as_slice());
         assert_eq!(rust, naive);
     }
 

@@ -16,7 +16,7 @@
 
 use snarkvm_curves::{
     bls12_377::{Fq, Fr, G1Affine, G1Projective},
-    traits::{AffineCurve, Group, ProjectiveCurve},
+    traits::{AffineCurve, Group},
 };
 use snarkvm_fields::{PrimeField, Zero};
 use snarkvm_utilities::BitIteratorBE;
@@ -258,6 +258,7 @@ mod tests {
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
     use snarkvm_curves::bls12_377::Fq;
+    use snarkvm_curves::ProjectiveCurve;
     use snarkvm_fields::{Field, PrimeField};
     use snarkvm_utilities::UniformRand;
 

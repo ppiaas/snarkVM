@@ -249,7 +249,7 @@ fn calculate_coeff<G: AffineCurve>(
     assignment: &[<G::ScalarField as PrimeField>::BigInteger],
 ) -> G::Projective {
     let el = query[0];
-    let acc = VariableBaseMSM::multi_scalar_mul(&query[1..], assignment);
+    let acc = VariableBaseMSM::msm_standard(&query[1..], assignment);
 
     let mut res = initial;
     res.add_assign_mixed(&el);
