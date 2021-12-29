@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Network, Transactions};
+use crate::{Network, Record, Transaction, Transactions};
 use snarkvm_utilities::{FromBytes, FromBytesDeserializer, ToBytes, ToBytesSerializer};
 
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
@@ -204,6 +204,47 @@ impl<'de, N: Network> Deserialize<'de> for BlockTemplate<N> {
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block template"),
         }
+    }
+}
+
+
+///
+/// The coinbase template used by miners to mine the next block.
+///
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoinbaseTemplate<N: Network> {
+    transaction: Transaction<N>,
+    record: Record<N>,
+}
+
+impl<N: Network> CoinbaseTemplate<N> {
+    /// Initializes a new coinbase template.
+    pub fn new(
+        transaction: Transaction<N>,
+        record: Record<N>,
+    ) -> Self {
+        Self {
+            transaction,
+            record,
+        }
+    }
+
+    /// Initializes an instance of `CoinbaseTemplate` from the given inputs.
+    pub fn from(coinbase: (Transaction<N>, Record<N>)) -> Self {
+        Self {
+            transaction: coinbase.0,
+            record: coinbase.1,
+        }
+    }
+
+    /// Returns a reference to the coinbase transaction.
+    pub fn transaction(&self) -> Transaction<N> {
+        self.transaction.clone()
+    }
+
+    /// Returns a reference to the coinbase record.
+    pub fn record(&self) -> Record<N> {
+        self.record.clone()
     }
 }
 
