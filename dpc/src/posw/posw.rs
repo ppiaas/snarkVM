@@ -16,11 +16,11 @@
 
 //! Generic PoSW Miner and Verifier, compatible with any implementer of the SNARK trait.
 
-use crate::{posw::PoSWCircuit, BlockHeader, Network, PoSWScheme, PoswError};
-use core::sync::atomic::AtomicBool;
+use crate::{posw::PoSWCircuit, BlockHeader, Network, PoSWError, PoSWProof, PoSWScheme};
 use snarkvm_algorithms::{crh::sha256d_to_u64, traits::SNARK, SRS};
 use snarkvm_utilities::{FromBytes, ToBytes, UniformRand};
 
+use core::sync::atomic::AtomicBool;
 use rand::{CryptoRng, Rng};
 
 use std::time::Instant;
@@ -36,10 +36,12 @@ pub struct PoSW<N: Network> {
 }
 
 impl<N: Network> PoSWScheme<N> for PoSW<N> {
-    /// Sets up an instance of PoSW using an SRS.
+    ///
+    /// Initializes a new instance of PoSW using the given SRS.
+    ///
     fn setup<R: Rng + CryptoRng>(
         srs: &mut SRS<R, <<N as Network>::PoSWSNARK as SNARK>::UniversalSetupParameters>,
-    ) -> Result<Self, PoswError> {
+    ) -> Result<Self, PoSWError> {
         let (proving_key, verifying_key) =
             <<N as Network>::PoSWSNARK as SNARK>::setup::<_, R>(&PoSWCircuit::<N>::blank()?, srs)?;
 
@@ -49,8 +51,10 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
         })
     }
 
+    ///
     /// Loads an instance of PoSW using stored parameters.
-    fn load(is_prover: bool) -> Result<Self, PoswError> {
+    ///
+    fn load(is_prover: bool) -> Result<Self, PoSWError> {
         Ok(Self {
             proving_key: match is_prover {
                 true => Some(N::posw_proving_key().clone()),
@@ -60,43 +64,78 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
         })
     }
 
+    ///
     /// Returns a reference to the PoSW circuit proving key.
+    ///
     fn proving_key(&self) -> &Option<<N::PoSWSNARK as SNARK>::ProvingKey> {
         &self.proving_key
     }
 
+    ///
     /// Returns a reference to the PoSW circuit verifying key.
+    ///
     fn verifying_key(&self) -> &<N::PoSWSNARK as SNARK>::VerifyingKey {
         &self.verifying_key
     }
 
-    /// Given the leaves of the block header, it will calculate a PoSW and nonce
-    /// such that they are under the difficulty target.
+    ///
+    /// Given the block header, compute a PoSW and nonce that satisfies the difficulty target.
+    ///
     fn mine<R: Rng + CryptoRng>(
         &self,
         block_header: &mut BlockHeader<N>,
         terminator: &AtomicBool,
         rng: &mut R,
-    ) -> Result<(), PoswError> {
-        let pk = self.proving_key.as_ref().expect("tried to mine without a PK set up");
-
+    ) -> Result<(), PoSWError> {
         loop {
+
             let prove_start = Instant::now();
-            // Sample a random nonce.
-            block_header.set_nonce(UniformRand::rand(rng));
-
-            // Instantiate the circuit.
-            let circuit = PoSWCircuit::<N>::new(&block_header)?;
-
-            // Generate the proof.
-            block_header.set_proof(
-                <<N as Network>::PoSWSNARK as SNARK>::prove_with_terminator(pk, &circuit, terminator, rng)?.into(),
-            );
+            // Run one iteration of PoSW.
+            self.mine_once_unchecked(block_header, terminator, rng)?;
             trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}, ", prove_start.elapsed(), block_header.height(), block_header.timestamp(), block_header.difficulty_target(), block_header.cumulative_weight());
 
+            // Check if the updated block header is valid.
             if self.verify(block_header) {
                 break;
             }
+        }
+        Ok(())
+    }
+
+    ///
+    /// Given the block header, compute a PoSW proof.
+    /// WARNING - This method does *not* ensure the resulting proof satisfies the difficulty target.
+    ///
+    fn mine_once_unchecked<R: Rng + CryptoRng>(
+        &self,
+        block_header: &mut BlockHeader<N>,
+        terminator: &AtomicBool,
+        rng: &mut R,
+    ) -> Result<(), PoSWError> {
+        let pk = self.proving_key.as_ref().expect("tried to mine without a PK set up");
+
+        // Sample a random nonce.
+        block_header.set_nonce(UniformRand::rand(rng));
+
+        // Instantiate the circuit.
+        let circuit = PoSWCircuit::<N>::new(&block_header)?;
+
+        // Generate the proof.
+
+        // TODO (raychu86): TEMPORARY - Remove this after testnet2 period.
+        // Mine blocks with the deprecated PoSW mode for blocks behind `V12_UPGRADE_BLOCK_HEIGHT`.
+        if <N as Network>::NETWORK_ID == 2 && block_header.height() <= crate::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            let pk = <crate::testnet2::DeprecatedPoSWSNARK<N> as SNARK>::ProvingKey::from_bytes_le(&pk.to_bytes_le()?)?;
+            block_header.set_proof(PoSWProof::<N>::new_hiding(
+                <crate::testnet2::DeprecatedPoSWSNARK<N> as SNARK>::prove_with_terminator(
+                    &pk, &circuit, terminator, rng,
+                )?
+                .into(),
+            ));
+        } else {
+            block_header.set_proof(PoSWProof::<N>::new(
+                <<N as Network>::PoSWSNARK as SNARK>::prove_with_terminator(pk, &circuit, terminator, rng)?.into(),
+            ));
         }
 
         Ok(())
@@ -115,14 +154,14 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
 
         // Ensure the difficulty target is met.
         match proof.to_bytes_le() {
-            Ok(proof) => {
-                let hash_difficulty = sha256d_to_u64(&proof);
-                if hash_difficulty > block_header.difficulty_target() {
+            Ok(proof_bytes) => {
+                let proof_difficulty = sha256d_to_u64(&proof_bytes);
+                if proof_difficulty > block_header.difficulty_target() {
                     #[cfg(debug_assertions)]
                     eprintln!(
                         "PoSW difficulty target is not met. Expected {}, found {}",
                         block_header.difficulty_target(),
-                        hash_difficulty
+                        proof_difficulty
                     );
                     return false;
                 }
@@ -139,10 +178,33 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             *block_header.nonce(),
         ];
 
-        // Ensure the proof is valid.
-        if !<<N as Network>::PoSWSNARK as SNARK>::verify(&self.verifying_key, &inputs, &*proof).unwrap() {
-            eprintln!("PoSW proof verification failed");
-            return false;
+        // TODO (raychu86): TEMPORARY - Remove this after testnet2 period.
+        // Verify blocks with the deprecated PoSW mode for blocks behind `V12_UPGRADE_BLOCK_HEIGHT`.
+        let block_height = block_header.height();
+        if <N as Network>::NETWORK_ID == 2 && block_height <= crate::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            // Ensure the proof type is hiding.
+            if !proof.is_hiding() {
+                eprintln!("[deprecated] PoSW proof for block {} should be hiding", block_height);
+                return false;
+            }
+
+            // Ensure the proof is valid under the deprecated PoSW parameters.
+            if !proof.verify(&self.verifying_key, &inputs) {
+                eprintln!("[deprecated] PoSW proof verification failed");
+                return false;
+            }
+        } else {
+            // Ensure the proof type is not hiding.
+            if proof.is_hiding() {
+                eprintln!("PoSW proof for block {} should not be hiding", block_height);
+                return false;
+            }
+
+            // Ensure the proof is valid under the PoSW parameters.
+            if !proof.verify(&self.verifying_key, &inputs) {
+                eprintln!("PoSW proof verification failed");
+                return false;
+            }
         }
 
         true
@@ -155,7 +217,7 @@ mod tests {
 
     use crate::{testnet2::Testnet2, Network, PoSWScheme};
     use snarkvm_algorithms::{SNARK, SRS};
-    use snarkvm_marlin::ahp::AHPForR1CS;
+    use snarkvm_marlin::{ahp::AHPForR1CS, marlin::MarlinTestnet1Mode};
     use snarkvm_utilities::ToBytes;
 
     use rand::{rngs::ThreadRng, thread_rng};
@@ -169,8 +231,10 @@ mod tests {
     fn test_posw_marlin() {
         // Construct an instance of PoSW.
         let posw = {
-            let max_degree =
-                AHPForR1CS::<<Testnet2 as Network>::InnerScalarField>::max_degree(20000, 20000, 200000).unwrap();
+            let max_degree = AHPForR1CS::<<Testnet2 as Network>::InnerScalarField, MarlinTestnet1Mode>::max_degree(
+                20000, 20000, 200000,
+            )
+            .unwrap();
             let universal_srs =
                 <<Testnet2 as Network>::PoSWSNARK as SNARK>::universal_setup(&max_degree, &mut thread_rng()).unwrap();
             <<Testnet2 as Network>::PoSW as PoSWScheme<Testnet2>>::setup::<ThreadRng>(

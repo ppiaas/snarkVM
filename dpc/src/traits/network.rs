@@ -92,6 +92,7 @@ pub trait Bech32Object<T: Clone + Debug + ToBytes + FromBytes + PartialEq + Eq +
     + Send
 {
     fn prefix() -> String;
+    fn size_in_bytes() -> usize;
 }
 
 #[rustfmt::skip]
@@ -152,6 +153,12 @@ pub trait Network: 'static + Copy + Clone + Debug + Default + PartialEq + Eq + S
     const ALEO_BLOCK_TIME_IN_SECS: i64;
     const ALEO_STARTING_SUPPLY_IN_CREDITS: i64;
 
+    /// The maximum future block time.
+    const ALEO_FUTURE_TIME_LIMIT_IN_SECS: i64;
+
+    /// The maximum number of blocks that a fork can be.
+    const ALEO_MAXIMUM_FORK_DEPTH: u32;
+
     /// Inner curve type declarations.
     type InnerCurve: PairingEngine<Fr = Self::InnerScalarField, Fq = Self::OuterScalarField>;
     type InnerScalarField: PrimeField + PoseidonDefaultParametersField;
@@ -159,7 +166,7 @@ pub trait Network: 'static + Copy + Clone + Debug + Default + PartialEq + Eq + S
     /// Outer curve type declarations.
     type OuterCurve: PairingEngine;
     type OuterBaseField: PrimeField;
-    type OuterScalarField: PrimeField;
+    type OuterScalarField: PrimeField + PoseidonDefaultParametersField;
 
     /// Program curve type declarations.
     type ProgramAffineCurve: AffineCurve<BaseField = Self::ProgramBaseField>;

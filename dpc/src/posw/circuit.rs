@@ -141,7 +141,8 @@ impl<N: Network> ConstraintSynthesizer<N::InnerScalarField> for PoSWCircuit<N> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{testnet1::Testnet1, testnet2::Testnet2};
+    use crate::{testnet1::Testnet1, testnet2::Testnet2, PoSWProof};
+    use snarkvm_marlin::marlin::MarlinTestnet1Mode;
     use snarkvm_r1cs::TestConstraintSystem;
     use snarkvm_utilities::{FromBytes, ToBytes};
 
@@ -171,8 +172,10 @@ mod test {
     fn posw_proof_test<N: Network, R: Rng + CryptoRng>(rng: &mut R) {
         // Generate the proving and verifying key.
         let (proving_key, verifying_key) = {
-            let max_degree =
-                snarkvm_marlin::ahp::AHPForR1CS::<N::InnerScalarField>::max_degree(20000, 20000, 200000).unwrap();
+            let max_degree = snarkvm_marlin::ahp::AHPForR1CS::<N::InnerScalarField, MarlinTestnet1Mode>::max_degree(
+                20000, 20000, 200000,
+            )
+            .unwrap();
             let universal_srs = <<N as Network>::PoSWSNARK as SNARK>::universal_setup(&max_degree, rng).unwrap();
 
             <<N as Network>::PoSWSNARK as SNARK>::setup::<_, R>(
@@ -192,7 +195,10 @@ mod test {
             println!("\nPosW elapsed time: {} ms\n", (Instant::now() - timer).as_millis());
             proof
         };
-        assert_eq!(proof.to_bytes_le().unwrap().len(), N::HEADER_PROOF_SIZE_IN_BYTES);
+        assert_eq!(
+            PoSWProof::<N>::new(proof.clone().into()).to_bytes_le().unwrap().len(),
+            N::HEADER_PROOF_SIZE_IN_BYTES
+        );
 
         // Verify the proof is valid on the public inputs.
         let inputs = vec![
