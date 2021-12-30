@@ -20,6 +20,7 @@ use crate::{posw::PoSWCircuit, BlockHeader, Network, PoSWError, PoSWProof, PoSWS
 use snarkvm_algorithms::{crh::sha256d_to_u64, traits::SNARK, SRS};
 use snarkvm_utilities::{FromBytes, ToBytes, UniformRand};
 
+use chrono::Utc;
 use core::sync::atomic::AtomicBool;
 use rand::{CryptoRng, Rng};
 
@@ -87,10 +88,16 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
         terminator: &AtomicBool,
         rng: &mut R,
     ) -> Result<(), PoSWError> {
+        const MAXIMUM_MINING_DURATION: i64 = 600; // 600 seconds = 10 minutes.
+        let mut iteration = 1;
         loop {
+            // Every 100 iterations, check that the miner is still within the allowed mining duration.
+            if iteration % 100 == 0 && Utc::now().timestamp() >= block_header.timestamp() + MAXIMUM_MINING_DURATION {
+                return Err(PoSWError::Message("Failed mine block in the allowed mining duration".to_string()).into());
+            }
 
-            let prove_start = Instant::now();
             // Run one iteration of PoSW.
+            let prove_start = Instant::now();
             self.mine_once_unchecked(block_header, terminator, rng)?;
             trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}, ", prove_start.elapsed(), block_header.height(), block_header.timestamp(), block_header.difficulty_target(), block_header.cumulative_weight());
 
@@ -98,6 +105,8 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             if self.verify(block_header) {
                 break;
             }
+
+            iteration += 1;
         }
         Ok(())
     }
