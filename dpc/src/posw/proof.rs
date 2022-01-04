@@ -15,7 +15,7 @@
 // along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Network, PoSWError};
-use snarkvm_algorithms::SNARK;
+use snarkvm_algorithms::{crh::sha256d_to_u64, SNARK};
 use snarkvm_utilities::{
     fmt,
     io::{Read, Result as IoResult, Write},
@@ -37,17 +37,23 @@ pub enum PoSWProof<N: Network> {
 }
 
 impl<N: Network> PoSWProof<N> {
+    ///
     /// Initializes a new instance of a PoSW proof.
+    ///
     pub fn new(proof: N::PoSWProof) -> Self {
         Self::NonHiding(proof)
     }
 
+    ///
     /// Initializes a new instance of a hiding PoSW proof.
+    ///
     pub fn new_hiding(proof: crate::testnet2::DeprecatedPoSWProof<N>) -> Self {
         Self::Hiding(proof)
     }
 
+    ///
     /// Returns `true` if the PoSW proof is hiding.
+    ///
     pub fn is_hiding(&self) -> bool {
         match self {
             Self::NonHiding(..) => false,
@@ -55,16 +61,25 @@ impl<N: Network> PoSWProof<N> {
         }
     }
 
+    ///
+    /// Returns the proof difficulty, determined by double-hashing the proof bytes to a u64.
+    ///
+    pub fn to_proof_difficulty(&self) -> Result<u64> {
+        Ok(sha256d_to_u64(&self.to_bytes_le()?))
+    }
+
+    ///
     /// Returns `true` if the PoSW proof is valid.
+    ///
     pub fn verify(
         &self,
         verifying_key: &<<N as Network>::PoSWSNARK as SNARK>::VerifyingKey,
-        inputs: &Vec<N::InnerScalarField>,
+        inputs: &[N::InnerScalarField],
     ) -> bool {
         match self {
             Self::NonHiding(proof) => {
                 // Ensure the proof is valid.
-                if !<<N as Network>::PoSWSNARK as SNARK>::verify(verifying_key, inputs, proof).unwrap() {
+                if !<<N as Network>::PoSWSNARK as SNARK>::verify(verifying_key, &inputs.to_vec(), proof).unwrap() {
                     eprintln!("PoSW proof verification failed");
                     return false;
                 }
@@ -82,7 +97,9 @@ impl<N: Network> PoSWProof<N> {
                     };
 
                 // Ensure the proof is valid.
-                if !<crate::testnet2::DeprecatedPoSWSNARK<N> as SNARK>::verify(&verifying_key, inputs, proof).unwrap() {
+                if !<crate::testnet2::DeprecatedPoSWSNARK<N> as SNARK>::verify(&verifying_key, &inputs.to_vec(), proof)
+                    .unwrap()
+                {
                     eprintln!("[deprecated] PoSW proof verification failed");
                     return false;
                 }
@@ -108,10 +125,8 @@ impl<N: Network> FromBytes for PoSWProof<N> {
             if let Ok(proof) = N::PoSWProof::read_le(&buffer[..691]) {
                 return Ok(Self::NonHiding(proof));
             }
-        } else {
-            if let Ok(proof) = crate::testnet2::DeprecatedPoSWProof::<N>::read_le(&buffer[..]) {
-                return Ok(Self::Hiding(proof));
-            }
+        } else if let Ok(proof) = crate::testnet2::DeprecatedPoSWProof::<N>::read_le(&buffer[..]) {
+            return Ok(Self::Hiding(proof));
         }
 
         Err(PoSWError::Message("Failed to deserialize PoSW proof with FromBytes".to_string()).into())
@@ -136,7 +151,7 @@ impl<N: Network> FromStr for PoSWProof<N> {
     type Err = anyhow::Error;
 
     fn from_str(header: &str) -> Result<Self, Self::Err> {
-        Ok(serde_json::from_str(&header)?)
+        Ok(serde_json::from_str(header)?)
     }
 }
 
@@ -209,12 +224,12 @@ mod tests {
         {
             assert_eq!(0, ledger.latest_block_height());
             let latest_block_header = ledger.latest_block().unwrap().header().clone();
-            let latest_proof = latest_block_header.proof().as_ref().unwrap();
+            let latest_proof = latest_block_header.proof();
             assert_eq!(
                 latest_proof.to_bytes_le().unwrap().len(),
                 Testnet2::HEADER_PROOF_SIZE_IN_BYTES
             ); // NOTE: Marlin proofs use compressed serialization
-            assert!(Testnet2::posw().verify(&latest_block_header));
+            assert!(Testnet2::posw().verify_from_block_header(&latest_block_header));
             assert!(latest_proof.is_hiding());
         }
 
@@ -225,12 +240,12 @@ mod tests {
             assert_eq!(1, ledger.latest_block_height());
 
             let latest_block_header = ledger.latest_block().unwrap().header().clone();
-            let latest_proof = latest_block_header.proof().as_ref().unwrap();
+            let latest_proof = latest_block_header.proof();
             assert_eq!(
                 latest_proof.to_bytes_le().unwrap().len(),
                 Testnet2::HEADER_PROOF_SIZE_IN_BYTES
             ); // NOTE: Marlin proofs use compressed serialization
-            assert!(Testnet2::posw().verify(&latest_block_header));
+            assert!(Testnet2::posw().verify_from_block_header(&latest_block_header));
             assert!(latest_proof.is_hiding());
         }
 
@@ -241,12 +256,12 @@ mod tests {
             assert_eq!(2, ledger.latest_block_height());
 
             let latest_block_header = ledger.latest_block().unwrap().header().clone();
-            let latest_proof = latest_block_header.proof().as_ref().unwrap();
+            let latest_proof = latest_block_header.proof();
             assert_eq!(
                 latest_proof.to_bytes_le().unwrap().len(),
                 Testnet2::HEADER_PROOF_SIZE_IN_BYTES
             ); // NOTE: Marlin proofs use compressed serialization
-            assert!(Testnet2::posw().verify(&latest_block_header));
+            assert!(Testnet2::posw().verify_from_block_header(&latest_block_header));
             assert!(!latest_proof.is_hiding());
         }
     }
@@ -257,7 +272,7 @@ mod tests {
         {
             let block =
                 Block::<Testnet1>::read_le(&snarkvm_parameters::testnet1::GenesisBlock::load_bytes()[..]).unwrap();
-            let proof = block.header().proof().to_owned().unwrap();
+            let proof = block.header().proof();
             assert!(!proof.is_hiding());
             assert_eq!(proof.to_bytes_le().unwrap().len(), Testnet1::HEADER_PROOF_SIZE_IN_BYTES);
             assert_eq!(
@@ -268,7 +283,7 @@ mod tests {
         {
             let block =
                 Block::<Testnet2>::read_le(&snarkvm_parameters::testnet2::GenesisBlock::load_bytes()[..]).unwrap();
-            let proof = block.header().proof().to_owned().unwrap();
+            let proof = block.header().proof();
             assert!(proof.is_hiding());
             assert_eq!(proof.to_bytes_le().unwrap().len(), Testnet2::HEADER_PROOF_SIZE_IN_BYTES);
             assert_eq!(
@@ -281,7 +296,7 @@ mod tests {
     #[test]
     fn test_proof_serde_json() {
         {
-            let proof = Testnet1::genesis_block().header().proof().to_owned().unwrap();
+            let proof = Testnet1::genesis_block().header().proof().clone();
 
             // Serialize
             let expected_string = proof.to_string();
@@ -294,7 +309,7 @@ mod tests {
             assert_eq!(proof, serde_json::from_str(&candidate_string).unwrap());
         }
         {
-            let proof = Testnet2::genesis_block().header().proof().to_owned().unwrap();
+            let proof = Testnet2::genesis_block().header().proof().clone();
 
             // Serialize
             let expected_string = proof.to_string();
@@ -311,7 +326,7 @@ mod tests {
     #[test]
     fn test_proof_bincode() {
         {
-            let proof = Testnet1::genesis_block().header().proof().to_owned().unwrap();
+            let proof = Testnet1::genesis_block().header().proof().clone();
 
             let expected_bytes = proof.to_bytes_le().unwrap();
             assert_eq!(&expected_bytes[..], &bincode::serialize(&proof).unwrap()[..]);
@@ -320,7 +335,7 @@ mod tests {
             assert_eq!(proof, bincode::deserialize(&expected_bytes[..]).unwrap());
         }
         {
-            let proof = Testnet2::genesis_block().header().proof().to_owned().unwrap();
+            let proof = Testnet2::genesis_block().header().proof().clone();
 
             let expected_bytes = proof.to_bytes_le().unwrap();
             assert_eq!(&expected_bytes[..], &bincode::serialize(&proof).unwrap()[..]);
