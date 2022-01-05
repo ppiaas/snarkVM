@@ -62,6 +62,7 @@ gadgets = ["snarkvm-gadgets"]
 parameters = ["snarkvm-parameters"]
 r1cs = ["snarkvm-r1cs"]
 utilities = ["snarkvm-utilities"]
+cuda = ["snarkvm-dpc/cuda"]
 
 ## snarkVM workspace specific ##
 parameters_no_std_out = ["snarkvm-parameters/no_std_out"]
