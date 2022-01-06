@@ -310,9 +310,10 @@ impl<
         }
 
         let first_round_comm_time = start_timer!(|| "Committing to first round polys");
-        let (first_commitments, first_commitment_randomnesses) = PC::commit(
+        let (first_commitments, first_commitment_randomnesses) = PC::commit_with_terminator(
             &circuit_proving_key.committer_key,
             prover_first_oracles.iter(),
+            terminator,
             Some(zk_rng),
         )?;
         end_timer!(first_round_comm_time);
