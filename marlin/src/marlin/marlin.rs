@@ -502,8 +502,9 @@ impl<
                 .iter()
                 .find(|lc| &lc.label == label)
                 .ok_or_else(|| AHPError::MissingEval(label.to_string()))?;
-            let evaluation = polynomials.get_lc_eval(lc, *point)?;
+
             if !AHPForR1CS::<TargetField, MM>::LC_WITH_ZERO_EVAL.contains(&lc.label.as_ref()) {
+                let evaluation = polynomials.get_lc_eval(lc, *point)?;
                 evaluations_unsorted.push((label.to_string(), evaluation));
             }
         }
