@@ -77,13 +77,6 @@ impl VariableBaseMSM {
         }
         standard::msm_standard(bases, scalars)
     }
-
-    pub fn msm_standard<G: AffineCurve>(
-        bases: &[G],
-        scalars: &[<G::ScalarField as PrimeField>::BigInteger],
-    ) -> G::Projective {
-        standard::msm_standard(bases, scalars)
-    }
 }
 
 #[cfg(test)]
