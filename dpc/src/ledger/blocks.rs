@@ -469,7 +469,7 @@ impl<N: Network> Blocks<N> {
     ///     tau = The half life of the algorithm. For every `tau` seconds ahead of
     ///           schedule a block’s timestamp becomes, the difficulty doubles.
     /// To avoid use of floating points, we use fixed-point arithmetic.
-    fn asert_retarget(
+    pub fn asert_retarget(
         anchor_timestamp: i64,
         anchor_difficulty_target: u64,
         anchor_block_height: u32,
