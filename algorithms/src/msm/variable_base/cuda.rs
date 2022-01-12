@@ -22,7 +22,7 @@ use snarkvm_fields::{PrimeField, Zero};
 use snarkvm_utilities::BitIteratorBE;
 
 use cuda_oxide::*;
-use std::{any::TypeId, rc::Rc, time::Instant};
+use std::{any::TypeId, rc::Rc};
 
 pub struct CudaRequest {
     bases: Vec<G1Affine>,
@@ -81,8 +81,6 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
         context.num_groups as u64 * window_lengths.len() as u64 * 8 * LIMB_COUNT as u64 * 3,
     )?;
 
-    let start = Instant::now();
-
     context.stream.launch(
         &context.pixel_func,
         window_lengths.len() as u32,
@@ -99,9 +97,6 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
 
     context.stream.sync()?;
 
-    let time = (start.elapsed().as_micros() as f64) / 1000.0;
-    println!("msm-pixel took {} ms", time);
-
     context.stream.launch(
         &context.row_func,
         1,
@@ -111,9 +106,6 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
     )?;
 
     context.stream.sync()?;
-
-    let time = (start.elapsed().as_micros() as f64) / 1000.0;
-    println!("msm-row took {} ms", time);
 
     let mut out = context.output_buf.load()?;
 
