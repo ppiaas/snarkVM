@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-static const uint32_t WINDOW_SIZE = 128;
+static const uint32_t WINDOW_SIZE = 1024;
 static const uint32_t BLST_WIDTH = 253;
 
 extern "C" __global__ void msm6_pixel(blst_p1* bucket_lists, const blst_p1_affine* bases_in, const blst_scalar* scalars, const uint32_t* window_lengths, const uint32_t window_count) {
@@ -28,11 +28,11 @@ extern "C" __global__ void msm6_pixel(blst_p1* bucket_lists, const blst_p1_affin
         activated_bases[activated_base_index++] = i;
     }
     uint32_t i = 0;
-    for (; i < (activated_base_index / 2 * 2); i += 2) {
-        blst_p1 intermediate;
-        blst_p1_add_affines_into_projective(&intermediate, &bases_in[activated_bases[i]], &bases_in[activated_bases[i + 1]]);
-        blst_p1_add_projective_to_projective(&bucket, &bucket, &intermediate);
-    }
+    // for (; i < (activated_base_index / 2 * 2); i += 2) {
+    //     blst_p1 intermediate;
+    //     blst_p1_add_affines_into_projective(&intermediate, &bases_in[activated_bases[i]], &bases_in[activated_bases[i + 1]]);
+    //     blst_p1_add_projective_to_projective(&bucket, &bucket, &intermediate);
+    // }
     for (; i < activated_base_index; ++i) {
         blst_p1_add_affine_to_projective(&bucket, &bucket, &(bases_in[activated_bases[i]]));
     }

@@ -47,9 +47,9 @@ __device__ static inline void sub_mod_384_unchecked(blst_fp ret, const blst_fp a
 
 __device__ static inline void reduce(blst_fp x, const blst_fp p) {
     if (is_ge_384(x, p)) {
-        blst_fp x_sub;
-        sub_mod_384_unchecked(x_sub, x, p);
-        memcpy(x, x_sub, sizeof(blst_fp));
+        // blst_fp x_sub;
+        sub_mod_384_unchecked(x, x, p);
+        // memcpy(x, x_sub, sizeof(blst_fp));
     }
 }
 

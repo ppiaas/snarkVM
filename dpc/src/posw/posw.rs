@@ -116,7 +116,7 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             // Run one iteration of PoSW.
             let prove_start = Instant::now();
             let proof = self.prove_once_unchecked(&mut circuit, block_template, terminator, rng)?;
-            trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}, ", prove_start.elapsed(), block_template.block_height(), block_template.block_timestamp(), block_template.difficulty_target(), block_template.cumulative_weight());
+            trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}", prove_start.elapsed(), block_template.block_height(), block_template.block_timestamp(), block_template.difficulty_target(), block_template.cumulative_weight());
 
             // Check if the updated block header is valid.
             if self.verify(

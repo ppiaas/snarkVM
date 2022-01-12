@@ -22,7 +22,7 @@ use snarkvm_fields::{PrimeField, Zero};
 use snarkvm_utilities::BitIteratorBE;
 
 use cuda_oxide::*;
-use std::{any::TypeId, rc::Rc};
+use std::{any::TypeId, rc::Rc, time::Instant};
 
 pub struct CudaRequest {
     bases: Vec<G1Affine>,
@@ -42,7 +42,7 @@ struct CudaContext<'a, 'b, 'c> {
 const SCALAR_BITS: usize = 253;
 const BIT_WIDTH: usize = 1;
 const LIMB_COUNT: usize = 6;
-const WINDOW_SIZE: u32 = 128; // must match in cuda source
+const WINDOW_SIZE: u32 = 1024; // must match in cuda source
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
@@ -81,7 +81,7 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
         context.num_groups as u64 * window_lengths.len() as u64 * 8 * LIMB_COUNT as u64 * 3,
     )?;
 
-    // let start = Instant::now();
+    let start = Instant::now();
 
     context.stream.launch(
         &context.pixel_func,
@@ -99,8 +99,8 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
 
     context.stream.sync()?;
 
-    // let time = (start.elapsed().as_micros() as f64) / 1000.0;
-    // println!("msm-pixel took {} ms", time);
+    let time = (start.elapsed().as_micros() as f64) / 1000.0;
+    println!("msm-pixel took {} ms", time);
 
     context.stream.launch(
         &context.row_func,
@@ -112,8 +112,8 @@ fn handle_cuda_request(context: &mut CudaContext, request: &CudaRequest) -> Resu
 
     context.stream.sync()?;
 
-    // let time = (start.elapsed().as_micros() as f64) / 1000.0;
-    // println!("msm-row took {} ms", time);
+    let time = (start.elapsed().as_micros() as f64) / 1000.0;
+    println!("msm-row took {} ms", time);
 
     let mut out = context.output_buf.load()?;
 

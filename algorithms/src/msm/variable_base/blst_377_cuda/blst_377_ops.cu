@@ -245,10 +245,16 @@ __device__ void blst_p1_add_affine_to_projective(blst_p1 *out, const blst_p1 *p1
     blst_fp_sqr(hh, h);
     // printf("c-t%llu:add:5 %llu\n", threadIdx.x, hh[0]);
 
+    // Z3 = (Z1+H)^2-Z1Z1-HH
+    blst_fp_add(out->Z, p1->Z, h);
+    blst_fp_sqr(out->Z, out->Z);
+    blst_fp_sub(out->Z, out->Z, z1z1);
+    blst_fp_sub(out->Z, out->Z, hh);
+
     // I = 4*HH
     blst_fp i;
-    memcpy(i, hh, sizeof(blst_fp));
-    blst_fp_add(i, i, i);
+    // memcpy(i, hh, sizeof(blst_fp));
+    blst_fp_add(i, hh, hh);
     blst_fp_add(i, i, i);
     // printf("c-t%llu:add:6 %llu\n", threadIdx.x, i[0]);
 
@@ -285,12 +291,6 @@ __device__ void blst_p1_add_affine_to_projective(blst_p1 *out, const blst_p1 *p1
     blst_fp_mul(out->Y, out->Y, r);
     blst_fp_sub(out->Y, out->Y, j);
     // printf("c-t%llu:add:Y %llu\n", threadIdx.x, out->Y[0]);
-
-    // Z3 = (Z1+H)^2-Z1Z1-HH
-    blst_fp_add(out->Z, p1->Z, h);
-    blst_fp_sqr(out->Z, out->Z);
-    blst_fp_sub(out->Z, out->Z, z1z1);
-    blst_fp_sub(out->Z, out->Z, hh);
     // printf("c-t%llu:add:Z %llu\n", threadIdx.x, out->Z[0]);
 }
 
@@ -446,10 +446,10 @@ __device__ void blst_p1_add_affines_into_projective(blst_p1* out, const blst_p1_
 
     // mmadd-2007-bl does not support equal values for p1 and p2.
     // If `p1` and `p2` are equal, use the doubling algorithm.
-    if(is_blst_fp_eq(p1->X, p2->X) && is_blst_fp_eq(p1->Y, p2->Y)) {
-        blst_p1_double(out, p1);
-        return;
-    }
+    // if(is_blst_fp_eq(p1->X, p2->X) && is_blst_fp_eq(p1->Y, p2->Y)) {
+    //     blst_p1_double(out, p1);
+    //     return;
+    // }
 
     // H = X2-X1
     blst_fp h;
