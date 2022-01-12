@@ -32,6 +32,15 @@ macro_rules! biginteger {
             fn add_nocarry(&mut self, other: &Self) -> bool {
                 let mut carry = 0;
 
+                #[cfg(target_arch = "x86_64")]
+                for i in 0..$num_limbs {
+                    unsafe {
+                        use core::arch::x86_64::_addcarry_u64;
+                        carry = _addcarry_u64(carry, self.0[i], other.0[i], &mut self.0[i])
+                    };
+                }
+
+                #[cfg(not(target_arch = "x86_64"))]
                 for (a, b) in self.0.iter_mut().zip(other.0.iter()) {
                     *a = arithmetic::adc(*a, *b, &mut carry);
                 }
@@ -43,6 +52,15 @@ macro_rules! biginteger {
             fn sub_noborrow(&mut self, other: &Self) -> bool {
                 let mut borrow = 0;
 
+                #[cfg(target_arch = "x86_64")]
+                for i in 0..$num_limbs {
+                    unsafe {
+                        use core::arch::x86_64::_subborrow_u64;
+                        borrow = _subborrow_u64(borrow, self.0[i], other.0[i], &mut self.0[i])
+                    };
+                }
+
+                #[cfg(not(target_arch = "x86_64"))]
                 for (a, b) in self.0.iter_mut().zip(other.0.iter()) {
                     *a = arithmetic::sbb(*a, *b, &mut borrow);
                 }
@@ -50,6 +68,20 @@ macro_rules! biginteger {
                 borrow != 0
             }
 
+            #[cfg(target_arch = "x86_64")]
+            #[inline]
+            fn mul2(&mut self) {
+                let mut carry = 0;
+
+                for i in 0..$num_limbs {
+                    unsafe {
+                        use core::arch::x86_64::_addcarry_u64;
+                        carry = _addcarry_u64(carry, self.0[i], self.0[i], &mut self.0[i])
+                    };
+                }
+            }
+
+            #[cfg(not(target_arch = "x86_64"))]
             #[inline]
             fn mul2(&mut self) {
                 let mut last = 0;
