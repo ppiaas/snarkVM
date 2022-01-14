@@ -397,15 +397,19 @@ fn best_fft<T: DomainCoeff<F>, F: FftField>(a: &mut [T], omega: F, log_n: u32) {
     serial_radix2_fft(a, omega, log_n);
 }
 
+lazy_static::lazy_static! {
+    static ref LOG_CPUS: u32 = log2_floor(rayon::current_num_threads());
+}
+
 #[cfg(feature = "parallel")]
 fn best_fft<T: DomainCoeff<F>, F: FftField>(a: &mut [T], omega: F, log_n: u32) {
-    let num_cpus = rayon::current_num_threads();
-    let log_cpus = log2_floor(num_cpus);
+    // let num_cpus = rayon::current_num_threads();
+    // let log_cpus = log2_floor(num_cpus);
 
-    if log_n <= log_cpus {
+    if log_n <= *LOG_CPUS {
         serial_radix2_fft::<T, F>(a, omega, log_n);
     } else {
-        parallel_radix2_fft::<T, F>(a, omega, log_n, log_cpus);
+        parallel_radix2_fft::<T, F>(a, omega, log_n, *LOG_CPUS);
     }
 }
 
