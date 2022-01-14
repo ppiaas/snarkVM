@@ -423,6 +423,7 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
 
         let q_1_time = start_timer!(|| "Compute q_1 poly");
 
+        let q_1_init_time = start_timer!(||"q_1: init");
         let mul_domain_size = *[
             mask_poly.map_or(0, |p| p.len()),
             r_alpha_poly.coeffs.len() + summed_z_m.coeffs.len(),
@@ -437,6 +438,7 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
         let summed_z_m_evals = summed_z_m.evaluate_over_domain_by_ref(mul_domain);
         let z_poly_evals = z_poly.evaluate_over_domain_by_ref(mul_domain);
         let t_poly_m_evals = t_poly.evaluate_over_domain_by_ref(mul_domain);
+        end_timer!(q_1_init_time);
 
         cfg_iter_mut!(r_alpha_evals.evaluations)
             .zip(&summed_z_m_evals.evaluations)
@@ -447,7 +449,9 @@ impl<F: PrimeField, MM: MarlinMode> AHPForR1CS<F, MM> {
                 *a -= &(c * d);
             });
         let mut rhs = r_alpha_evals.interpolate();
+        let q_1_poly_add_time = start_timer!(||"q_1: poly add");
         rhs += mask_poly.map_or(&Polynomial::zero(), |p| p.polynomial());
+        end_timer!(q_1_poly_add_time);
         let q_1 = rhs;
         end_timer!(q_1_time);
 
