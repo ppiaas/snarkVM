@@ -275,6 +275,9 @@ impl<
         }
 
         let prover_init_state = AHPForR1CS::<_, MM>::prover_init(&circuit_proving_key.circuit, circuit)?;
+
+        let fs_rng_time = start_timer!(||"FS Rng");
+
         let public_input = prover_init_state.public_input();
         let padded_public_input = prover_init_state.padded_public_input();
 
@@ -294,6 +297,8 @@ impl<
                 .unwrap(),
             );
         }
+
+        end_timer!(fs_rng_time);
 
         // --------------------------------------------------------------------
         // First round
