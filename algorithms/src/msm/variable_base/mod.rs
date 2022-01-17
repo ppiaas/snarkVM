@@ -69,7 +69,7 @@ impl VariableBaseMSM {
                         Ok(x) => return x,
                         Err(e) => {
                             HAS_CUDA_FAILED.store(true, Ordering::SeqCst);
-                            eprintln!("CUDA failed, moving to next msm method: {:?}", e);
+                            eprintln!("CUDA failed, moving to next msm method. Error: {:?}", e);
                         }
                     }
                 }
