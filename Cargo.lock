@@ -1107,6 +1107,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f601807a248964869e222d209fd5f8e5bcc5542e4c9b1ef21bcee4424868ce5"
+dependencies = [
+ "ahash",
+ "metrics-macros",
+]
+
+[[package]]
+name = "metrics-macros"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44128401debcab0d777da11d005419b4d6ad6da8cb5eea64487c34ee0a311cf5"
+dependencies = [
+ "proc-macro2 1.0.36",
+ "quote 1.0.10",
+ "syn 1.0.81",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1986,6 +2007,7 @@ dependencies = [
  "derivative",
  "hex",
  "itertools",
+ "metrics",
  "once_cell",
  "rand",
  "rand_chacha",

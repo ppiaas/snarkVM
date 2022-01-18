@@ -34,6 +34,7 @@ use core::sync::atomic::AtomicBool;
 use rand::{CryptoRng, Rng};
 
 use std::time::Instant;
+use metrics::histogram;
 
 /// A Proof of Succinct Work miner and verifier.
 #[derive(Clone)]
@@ -116,7 +117,9 @@ impl<N: Network> PoSWScheme<N> for PoSW<N> {
             // Run one iteration of PoSW.
             let prove_start = Instant::now();
             let proof = self.prove_once_unchecked(&mut circuit, block_template, terminator, rng)?;
-            trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}", prove_start.elapsed(), block_template.block_height(), block_template.block_timestamp(), block_template.difficulty_target(), block_template.cumulative_weight());
+            let duration = prove_start.elapsed();
+            histogram!("snarkvm_posw_duration", duration);
+            trace!("Prove time: {:?}, height: {}, timestamp: {}, difficulty: {}, weight: {}", duration, block_template.block_height(), block_template.block_timestamp(), block_template.difficulty_target(), block_template.cumulative_weight());
 
             // Check if the updated block header is valid.
             if self.verify(

@@ -42,6 +42,9 @@ name = "transaction"
 path = "benches/transaction.rs"
 harness = false
 
+[dependencies]
+metrics = "0.18.0"
+
 [dependencies.snarkvm-algorithms]
 path = "../algorithms"
 version = "0.7.5"
